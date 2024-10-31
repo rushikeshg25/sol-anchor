@@ -8,23 +8,102 @@ declare_id!("AsjZ3kWAUSQRNt2pZVeJkywhZ6gpLpHZmJjduPmKZDZZ");
 pub mod votingfinaldapp {
     use super::*;
 
-    pub fn initialize(_ctx: Context<InitializePoll>) -> Result<()> {
+    pub fn initializePoll(
+        ctx: Context<InitializePoll>,
+        _poll_id: u64,
+        start_time: u64,
+        end_time: u64,
+        name: String,
+        description: String,
+    ) -> Result<()> {
+        ctx.accounts.poll_account.poll_name = name;
+        ctx.accounts.poll_account.poll_description = description;
+        ctx.accounts.poll_account.poll_voting_start = start_time;
+        ctx.accounts.poll_account.poll_voting_end = end_time;
+        Ok(())
+    }
+
+    pub fn initialize_candidate(
+        ctx: Context<InitializeCandidate>,
+        _poll_id: u64,
+        candidate: String,
+    ) -> Result<()> {
+        ctx.accounts.candidate_account.candidate_name = candidate;
+        ctx.accounts.poll_account.poll_option_index += 1;
+        Ok(())
+    }
+
+    pub fn vote(ctx: Context<Vote>, _poll_id: u64, _candidate: String) -> Result<()> {
+        let candidate_account = &mut ctx.accounts.candidate_account;
+        let current_time = Clock::get()?.unix_timestamp;
+
+        if (curreent_time < ctx.accounts.poll_account.poll_voting_start as i64) {
+            return Err(Error::VotingNotStarted.into());
+        }
+        if (current_time > ctx.accounts.poll_account.poll_voting_end as i64) {
+            return Err(Error::VotingEnded.into());
+        }
+        candidate_account.candidate_votes += 1;
         Ok(())
     }
 }
 
 #[derive(Accounts)]
+#[instruction(poll_id: u64)]
 pub struct InitializePoll<'info> {
     #[account(mut)]
-    pub payer: Signer<'info>,
+    pub signer: Signer<'info>,
 
     #[account(
-  init,
-  space = 8 + Votingfinaldapp::INIT_SPACE,
-  payer = payer
-  )]
-    pub votingfinaldapp: Account<'info, Votingfinaldapp>,
+        init_if_needed,
+        payer = signer,
+        space = 8 + PollAccount::INIT_SPACE,
+        seeds = [b"poll".as_ref(), poll_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub poll_account: Account<'info, PollAccount>,
+
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(poll_id: u64, candidate: String)]
+pub struct InitializeCandidate<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    pub poll_account: Account<'info, PollAccount>,
+
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + CandidateAccount::INIT_SPACE,
+        seeds = [poll_id.to_le_bytes().as_ref(), candidate.as_ref()],
+        bump
+    )]
+    pub candidate_account: Account<'info, CandidateAccount>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(poll_id: u64, candidate: String)]
+pub struct Vote<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"poll".as_ref(), poll_id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub poll_account: Account<'info, PollAccount>,
+
+    #[account(
+        mut,
+        seeds = [poll_id.to_le_bytes().as_ref(), candidate.as_ref()],
+        bump)]
+    pub candidate_account: Account<'info, CandidateAccount>,
 }
 
 #[account]
