@@ -14,3 +14,10 @@ pub mod counter {
 
 #[derive(Accounts)]
 pub struct Initialize {}
+
+#[account]
+#[derive(InitSpace)]
+pub struct Counter {
+    pub count: u64,
+    pub bump: u8,
+}
