@@ -8,7 +8,7 @@ declare_id!("AsjZ3kWAUSQRNt2pZVeJkywhZ6gpLpHZmJjduPmKZDZZ");
 pub mod votingfinaldapp {
     use super::*;
 
-    pub fn initializePoll(
+    pub fn initialize_poll(
         ctx: Context<InitializePoll>,
         _poll_id: u64,
         start_time: u64,
@@ -37,10 +37,10 @@ pub mod votingfinaldapp {
         let candidate_account = &mut ctx.accounts.candidate_account;
         let current_time = Clock::get()?.unix_timestamp;
 
-        if (curreent_time < ctx.accounts.poll_account.poll_voting_start as i64) {
+        if current_time < ctx.accounts.poll_account.poll_voting_start as i64 {
             return Err(Error::VotingNotStarted.into());
         }
-        if (current_time > ctx.accounts.poll_account.poll_voting_end as i64) {
+        if current_time > ctx.accounts.poll_account.poll_voting_end as i64 {
             return Err(Error::VotingEnded.into());
         }
         candidate_account.candidate_votes += 1;
