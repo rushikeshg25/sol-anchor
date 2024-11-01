@@ -82,9 +82,7 @@ pub struct DeleteEntry<'info> {
     pub system_program: Program<'info, System>,
     #[account(
       mut,
-      realloc=8+JournalEntryState::INIT_SPACE,
-      realloc::zero=true,
-      realloc::payer=owner,
+      close=owner,
       seeds=[title.as_bytes(),owner.key().as_ref()],
       bump)]
     pub journal_entry: Account<'info, JournalEntryState>,
