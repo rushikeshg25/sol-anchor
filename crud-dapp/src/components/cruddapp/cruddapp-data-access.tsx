@@ -10,7 +10,13 @@ import { useCluster } from "../cluster/cluster-data-access";
 import { useAnchorProvider } from "../solana/solana-provider";
 import { useTransactionToast } from "../ui/ui-layout";
 
-export function useCruddappProgram() {
+interface CreateEntryArgs {
+  title: string;
+  message: string;
+  owner: PublicKey;
+}
+
+export function useJournalProgram() {
   const { connection } = useConnection();
   const { cluster } = useCluster();
   const transactionToast = useTransactionToast();
@@ -22,7 +28,7 @@ export function useCruddappProgram() {
   const program = getCruddappProgram(provider);
 
   const accounts = useQuery({
-    queryKey: ["cruddapp", "all", { cluster }],
+    queryKey: ["journal", "all", { cluster }],
     queryFn: () => program.account.journalEntryState.all(),
   });
 
@@ -31,19 +37,23 @@ export function useCruddappProgram() {
     queryFn: () => connection.getParsedAccountInfo(programId),
   });
 
-  const initialize = useMutation({
-    mutationKey: ["cruddapp", "initialize", { cluster }],
-    mutationFn: (keypair: Keypair) =>
-      program.methods
-        .initialize()
-        .accounts({ cruddapp: keypair.publicKey })
-        .signers([keypair])
-        .rpc(),
+  const createEntry = useMutation<string, Error, CreateEntryArgs>({
+    mutationKey: ["journalEntry", "create", { cluster }],
+    mutationFn: async ({ title, message, owner }) => {
+      const [journalEntryAddress] = await PublicKey.findProgramAddress(
+        [Buffer.from(title), owner.toBuffer()],
+        programId
+      );
+
+      return program.methods.createJournalEntry(title, message).rpc();
+    },
     onSuccess: (signature) => {
       transactionToast(signature);
-      return accounts.refetch();
+      accounts.refetch();
     },
-    onError: () => toast.error("Failed to initialize account"),
+    onError: (error) => {
+      toast.error(`Failed to create journal entry: ${error.message}`);
+    },
   });
 
   return {
@@ -51,21 +61,55 @@ export function useCruddappProgram() {
     programId,
     accounts,
     getProgramAccount,
-    initialize,
+    createEntry,
   };
 }
 
-export function useCruddappProgramAccount({ account }: { account: PublicKey }) {
+export function useJournalProgramAccount({ account }: { account: PublicKey }) {
   const { cluster } = useCluster();
   const transactionToast = useTransactionToast();
-  const { program, accounts } = useCruddappProgram();
+  const { program, accounts } = useJournalProgram();
+  const programId = new PublicKey(
+    "8sddtWW1q7fwzspAfZj4zNpeQjpvmD3EeCCEfnc3JnuP"
+  );
 
   const accountQuery = useQuery({
-    queryKey: ["cruddapp", "fetch", { cluster, account }],
+    queryKey: ["journal", "fetch", { cluster, account }],
     queryFn: () => program.account.journalEntryState.fetch(account),
+  });
+
+  const updateEntry = useMutation<string, Error, CreateEntryArgs>({
+    mutationKey: ["journalEntry", "update", { cluster }],
+    mutationFn: async ({ title, message, owner }) => {
+      const [journalEntryAddress] = await PublicKey.findProgramAddress(
+        [Buffer.from(title), owner.toBuffer()],
+        programId
+      );
+
+      return program.methods.updateJournalEntry(title, message).rpc();
+    },
+    onSuccess: (signature) => {
+      transactionToast(signature);
+      accounts.refetch();
+    },
+    onError: (error) => {
+      toast.error(`Failed to update journal entry: ${error.message}`);
+    },
+  });
+
+  const deleteEntry = useMutation({
+    mutationKey: ["journal", "deleteEntry", { cluster, account }],
+    mutationFn: (title: string) =>
+      program.methods.deleteJournalEntry(title).rpc(),
+    onSuccess: (tx) => {
+      transactionToast(tx);
+      return accounts.refetch();
+    },
   });
 
   return {
     accountQuery,
+    updateEntry,
+    deleteEntry,
   };
 }
