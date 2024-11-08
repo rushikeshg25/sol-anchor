@@ -18,38 +18,49 @@ import {
 
 async function main() {
   const connection = new Connection(clusterApiUrl("devnet"));
+
   const user = await getKeypairFromFile();
+
   await airdropIfRequired(
     connection,
     user.publicKey,
     1 * LAMPORTS_PER_SOL,
     0.5 * LAMPORTS_PER_SOL
   );
-  console.log("loaded user keypair", user.publicKey.toBase58());
 
-  const umi = await createUmi(connection.rpcEndpoint);
+  console.log("Loaded user", user.publicKey.toBase58());
+
+  const umi = createUmi(connection.rpcEndpoint);
   umi.use(mplTokenMetadata());
 
-  const umiUser = await umi.eddsa.createKeypairFromSecretKey(user.secretKey);
+  const umiUser = umi.eddsa.createKeypairFromSecretKey(user.secretKey);
   umi.use(keypairIdentity(umiUser));
 
-  const collectionmint = generateSigner(umi);
+  console.log("Set up Umi instance for user");
+
+  const collectionMint = generateSigner(umi);
 
   const transaction = await createNft(umi, {
-    mint: collectionmint,
-    name: "My NFT",
-    symbol: "MNFT",
+    mint: collectionMint,
+    name: "My Collection",
+    symbol: "MC",
     uri: "https://raw.githubusercontent.com/rushikeshg25/sol-anchor/refs/heads/master/new-token/metadata.json",
     sellerFeeBasisPoints: percentAmount(0),
     isCollection: true,
   });
-
   await transaction.sendAndConfirm(umi);
 
-  const createdCollection = await fetchDigitalAsset(
+  const createdCollectionNft = await fetchDigitalAsset(
     umi,
-    collectionmint.publicKey
+    collectionMint.publicKey
   );
-  console.log("Collection created");
+
+  console.log(
+    `Collection created at ${getExplorerLink(
+      "address",
+      createdCollectionNft.mint.publicKey,
+      "devnet"
+    )}`
+  );
 }
 main();
