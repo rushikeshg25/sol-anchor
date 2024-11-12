@@ -1,6 +1,12 @@
 #![allow(clippy::result_large_err)]
 
+use std::str;
+
 use anchor_lang::prelude::*;
+use anchor_spl::{
+    token::{Mint, TokenAccount},
+    token_interface::TokenInterface,
+};
 
 declare_id!("AsjZ3kWAUSQRNt2pZVeJkywhZ6gpLpHZmJjduPmKZDZZ");
 
@@ -10,15 +16,91 @@ const ANCHOR_DISCRIMINATOR: usize = 8;
 pub mod tokenvesting {
     use super::*;
 
-    pub fn create_vesting_account(ctx: Context<CreateVestingAccount>) -> Result<()> {
+    pub fn create_vesting_account(
+        ctx: Context<CreateVestingAccount>,
+        company_name: String,
+    ) -> Result<()> {
+        *ctx.accounts.vesting_account = VestingAccount {
+            owner: ctx.accounts.signer.key(),
+            mint: ctx.accounts.mint.key(),
+            treasury_token_account: ctx.accounts.treasury_token_account.key(),
+            company_name,
+            bump: ctx.bumps.vesting_account,
+            treasury_bump: ctx.bumps.treasury_token_account,
+        };
+        Ok(())
+    }
+
+    pub fn create_employee_vesting(
+        ctx: Context<CreateEmployeeAccount>,
+        start_time: i64,
+        end_time: i64,
+        total_amount: i64,
+        cliff_time: i64,
+    ) -> Result<()> {
+        *ctx.accounts.employee_account = EmployeeAccount {
+            start_time,
+            cliff_time,
+            end_time,
+            total_amount,
+            total_withdrawal: 0,
+            beneficiary: ctx.accounts.beneficiary.key(),
+            vesting_account: ctx.accounts.vesting_account.key(),
+            bump: ctx.bumps.employee_account,
+        };
         Ok(())
     }
 }
 
 #[derive(Accounts)]
+#[instruction(company_name: String)]
 pub struct CreateVestingAccount<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
+
+    #[account(
+        init,
+        space = 8 + VestingAccount::INIT_SPACE,
+        payer = signer,
+        seeds = [company_name.as_ref()],
+        bump
+    )]
+    pub vesting_account: Account<'info, VestingAccount>,
+
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        init,
+        token::mint = mint,
+        token::authority = treasury_token_account,
+        payer = signer,
+        seeds = [b"vesting_treasury", company_name.as_bytes()],
+        bump
+    )]
+    pub treasury_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CreateEmployeeAccount<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub beneficiary: SystemAccount<'info>,
+
+    #[account(has_one=owner)]
+    pub vesting_account: Account<'info, VestingAccount>,
+
+    #[account(
+        init,
+        space=8+EmployeeAccount::INIT_SPACE,
+        payer=owner,
+        seeds=[b"employee_vesting",beneficiary.key().as_ref(),vesting_account.key().as_ref()],
+        bump
+    )]
+    pub employee_account: Account<'info, EmployeeAccount>,
+    pub system_program: Program<'info, System>,
 }
 
 #[account]
