@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-tokenvesting = "AsjZ3kWAUSQRNt2pZVeJkywhZ6gpLpHZmJjduPmKZDZZ"
+tokenvesting = "8rJdRtN5AiCYyzX7LYschWzMxeCsDQ8ubdNbo7N1gWQS"
 
 [registry]
 url = "https://api.apr.dev"
@@ -27,3 +27,5 @@ upgradeable = false
 bind_address = "127.0.0.1"
 ledger = ".anchor/test-ledger"
 rpc_port = 8899
+
+

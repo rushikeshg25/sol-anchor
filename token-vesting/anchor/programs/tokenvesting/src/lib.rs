@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
-declare_id!("GFdLg11UBR8ZeePW43ZyD1gY4z4UQ96LPa22YBgnn4z8");
+declare_id!("8rJdRtN5AiCYyzX7LYschWzMxeCsDQ8ubdNbo7N1gWQS");
 #[program]
-pub mod vesting {
+pub mod tokenvesting {
     use super::*;
 
     pub fn create_vesting_account(
@@ -48,11 +48,9 @@ pub mod vesting {
         let employee_account = &mut ctx.accounts.employee_account;
         let now = Clock::get()?.unix_timestamp;
 
-        // Check if the current time is before the cliff time
         if now < employee_account.cliff_time {
             return Err(ErrorCode::ClaimNotAvailableYet.into());
         }
-        // Calculate the vested amount
         let time_since_start = now.saturating_sub(employee_account.start_time);
         let total_vesting_time = employee_account
             .end_time
@@ -63,9 +61,7 @@ pub mod vesting {
             (employee_account.total_amount * time_since_start) / total_vesting_time
         };
 
-        //Calculate the amount that can be withdrawn
         let claimable_amount = vested_amount.saturating_sub(employee_account.total_withdrawn);
-        // Check if there is anything left to claim
         if claimable_amount == 0 {
             return Err(ErrorCode::NothingToClaim.into());
         }
