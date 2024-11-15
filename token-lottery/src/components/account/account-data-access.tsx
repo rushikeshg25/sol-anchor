@@ -97,7 +97,7 @@ export function useTransferSol({ address }: { address: PublicKey }) {
         }),
       ])
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
       toast.error(`Transaction failed! ${error}`)
     },
   })

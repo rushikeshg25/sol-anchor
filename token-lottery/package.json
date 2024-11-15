@@ -1,5 +1,5 @@
 {
-  "name": "template-next-tailwind-basic",
+  "name": "template-next-tailwind-counter",
   "version": "0.1.0",
   "private": true,
   "scripts": {
