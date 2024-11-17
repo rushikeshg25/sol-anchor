@@ -15,6 +15,13 @@ use anchor_spl::{
 use switchboard_on_demand::accounts::RandomnessAccountData;
 declare_id!("75QZtVPkNxku1hHt9p86rT5pjbkWw8YTsJiD5jZEseXg");
 
+#[constant]
+pub const NAME: &str = "Solana Lottery Ticket";
+#[constant]
+pub const URI: &str = "Token Lottery";
+#[constant]
+pub const SYMBOL: &str = "TKT";
+
 #[program]
 pub mod token_lottery {
     use super::*;
@@ -24,18 +31,14 @@ pub mod token_lottery {
         end_time: i64,
         ticket_price: u64,
     ) -> Result<()> {
-        *ctx.accounts.token_lottery = TokenLottery {
-            winner: 0,
-            winner_chosen: false,
-            start_time,
-            end_time,
-            lottery_pot_amount: 0,
-            total_tickets: 0,
-            ticket_price,
-            authority: ctx.accounts.payer.key(),
-            randomness_account: Pubkey::default(),
-            bump: ctx.bumps.token_lottery,
-        };
+        ctx.accounts.token_lottery.bump = ctx.bumps.token_lottery;
+        ctx.accounts.token_lottery.start_time = start_time;
+        ctx.accounts.token_lottery.end_time = end_time;
+        ctx.accounts.token_lottery.ticket_price = ticket_price;
+        ctx.accounts.token_lottery.authority = ctx.accounts.payer.key();
+        ctx.accounts.token_lottery.randomness_account = Pubkey::default();
+        ctx.accounts.token_lottery.total_tickets = 0;
+        ctx.accounts.token_lottery.winner_chosen = false;
         Ok(())
     }
 }
@@ -109,4 +112,11 @@ pub struct TokenLottery {
     pub ticket_price: u64,
     pub authority: Pubkey,
     pub randomness_account: Pubkey,
+}
+
+#[account]
+pub struct Ticket {
+    pub owner: Pubkey,
+    pub ticket_id: u64,
+    pub lottery: Pubkey,
 }
