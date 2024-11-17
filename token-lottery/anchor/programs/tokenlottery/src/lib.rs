@@ -41,6 +41,10 @@ pub mod token_lottery {
         ctx.accounts.token_lottery.winner_chosen = false;
         Ok(())
     }
+
+    pub fn buy_ticket(ctx:Context<BuyTicket>)->Result<()>{
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -74,11 +78,9 @@ pub struct InitializeLottery<'info> {
     )]
     pub collection_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    /// CHECK: This account will be initialized by the metaplex program
     #[account(mut)]
     pub metadata: UncheckedAccount<'info>,
 
-    /// CHECK: This account will be initialized by the metaplex program
     #[account(mut)]
     pub master_edition: UncheckedAccount<'info>,
 
@@ -97,6 +99,20 @@ pub struct InitializeLottery<'info> {
     pub system_program: Program<'info, System>,
     pub token_metadata_program: Program<'info, Metadata>,
     pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct BuyTicket<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    #[account(
+        init, 
+        payer=payer,
+        space=8+std::mem::size_of::<Ticket>())]
+    pub ticket: Account<'info, Ticket>,
+    #[account(mut)]
+    pub token_lottery: Account<'info, TokenLottery>,
 }
 
 #[account]
