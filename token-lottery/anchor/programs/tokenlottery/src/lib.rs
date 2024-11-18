@@ -42,9 +42,58 @@ pub mod token_lottery {
         Ok(())
     }
 
-    pub fn buy_ticket(ctx:Context<BuyTicket>)->Result<()>{
-        Ok(())
-    }
+    
+    pub fn buy_ticket(ctx: Context<BuyTicket>) -> Result<()> {
+    let token_lottery = &mut ctx.accounts.token_lottery;
+    let clock = Clock::get()?;
+
+    // Validate lottery is open
+    require!(
+        clock.unix_timestamp >= token_lottery.start_time
+            && clock.unix_timestamp <= token_lottery.end_time,
+        ErrorCode::InvalidTime
+    );
+
+    // Transfer ticket price from buyer to pot
+    system_program::transfer(
+        CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            system_program::Transfer {
+                from: ctx.accounts.payer.to_account_info(),
+                to: ctx.accounts.token_lottery.to_account_info(),
+            },
+        ),
+        token_lottery.ticket_price,
+    )?;
+
+    // Increment ticket count and assign ticket data
+    token_lottery.total_tickets += 1;
+    token_lottery.lottery_pot_amount += token_lottery.ticket_price;
+    ctx.accounts.ticket.owner = ctx.accounts.payer.key();
+    ctx.accounts.ticket.ticket_id = token_lottery.total_tickets;
+    ctx.accounts.ticket.lottery = ctx.accounts.token_lottery.key();
+
+    Ok(())
+}
+
+pub fn commit_a_winner(ctx: Context<CommitWinner>) -> Result<()> {
+    let token_lottery = &mut ctx.accounts.token_lottery;
+    let randomness_data = RandomnessAccountData::parse(ctx.accounts.randomness_account_data.data.borrow())?;
+    token_lottery.randomness_account = ctx.accounts.randomness_account_data.key();
+    Ok(())
+}
+
+pub fn claim_prize(ctx: Context<ClaimPrize>) -> Result<()> {
+    let token_lottery = &mut ctx.accounts.token_lottery;
+    require!(token_lottery.winner_chosen, ErrorCode::WinnerNotChosen);
+    require!(token_lottery.total_tickets == ctx.accounts.ticket.ticket_id, ErrorCode::WinnerNotChosen);
+
+    // Transfer prize amount to winner
+    **ctx.accounts.owner.try_borrow_mut_lamports()? += token_lottery.lottery_pot_amount;
+    token_lottery.lottery_pot_amount = 0;
+    Ok(())
+}
+
 }
 
 #[derive(Accounts)]
@@ -61,6 +110,16 @@ pub struct Initialize<'info> {
     )]
     pub token_lottery: Account<'info, TokenLottery>,
 }
+
+#[derive(Accounts)]
+pub struct ClaimPrize<'info> {
+    #[account(mut)]
+    pub token_lottery: Account<'info, TokenLottery>,
+    #[account(mut, has_one = owner)]
+    pub ticket: Account<'info, Ticket>,
+    pub owner: Signer<'info>,
+}
+
 
 #[derive(Accounts)]
 pub struct InitializeLottery<'info> {
@@ -115,6 +174,15 @@ pub struct BuyTicket<'info> {
     pub token_lottery: Account<'info, TokenLottery>,
 }
 
+
+#[derive(Accounts)]
+pub struct  CommitWinner<'info> {
+     #[account(mut, has_one = authority)]
+    pub token_lottery: Account<'info, TokenLottery>,
+    pub authority: Signer<'info>,
+    pub randomness_account_data: AccountInfo<'info>,
+}
+
 #[account]
 #[derive(Debug, InitSpace)]
 pub struct TokenLottery {
@@ -135,4 +203,20 @@ pub struct Ticket {
     pub owner: Pubkey,
     pub ticket_id: u64,
     pub lottery: Pubkey,
+}
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Invalid randomness account")]
+    InvalidRandomnessAccount,
+    #[msg("Invalid ticket account")]
+    InvalidTicketAccount,
+    #[msg("Invalid token lottery account")]
+    InvalidTokenLotteryAccount,
+    #[msg("Invalid ticket id")]
+    InvalidTicketId,
+    #[msg("Invalid Lottery time")]
+    InvalidTime,
+    #[msg("Winner not chosen")]
+    WinnerNotChosen,
 }
